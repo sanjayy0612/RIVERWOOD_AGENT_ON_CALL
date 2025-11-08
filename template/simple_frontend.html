@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Riverwood AI Agent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  
+  <style>
+    /* --- 1. Aurora Background & Font (REVERTED & BRIGHTENED) --- */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #031209; 
+      color: #ffffff;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* The "shady green" aurora effect (REINSTATED AND BRIGHTER on right) */
+    body::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 800px;
+      height: 800px;
+      transform: translate(-50%, -50%);
+      background: 
+        radial-gradient(circle at 20% 30%, rgba(20, 255, 150, 0.6), transparent 40%),
+        /* BRIGHTER: Increased alpha value for the right side */
+        radial-gradient(circle at 80% 70%, rgba(10, 220, 130, 0.6), transparent 40%); 
+      filter: blur(100px);
+      animation: pulse 10s infinite alternate;
+      z-index: 0;
+    }
+
+    /* Original pulse animation (REINSTATED) */
+    @keyframes pulse {
+      from { transform: translate(-50%, -50%) scale(0.9); }
+      to   { transform: translate(-45%, -55%) scale(1.2); }
+    }
+    
+    /* --- 2. Brand Title (Top Left) --- */
+    .brand-title {
+      position: absolute;
+      top: 30px;
+      left: 40px;
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.5rem;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.9);
+      z-index: 10;
+    }
+
+    /* --- 3. Main Centered Content (Layout) --- */
+    .main-container {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between; 
+      align-items: center;
+      width: 100%;
+      min-height: 100vh;
+      padding: 80px 20px 40px 20px; 
+      box-sizing: border-box;
+      z-index: 1; 
+    }
+
+    /* --- 4. Top Content Wrapper --- */
+    .top-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* --- 5. Riverwood Logo (CSS recreation) --- */
+    .logo-container {
+      width: 50px;
+      height: 50px;
+      padding: 5px;
+    }
+    .logo-1 {
+      width: 100%;
+      height: 100%;
+      border-top: 6px solid white;
+      border-right: 6px solid white;
+      box-sizing: border-box;
+      padding-top: 10px;
+      padding-right: 10px;
+    }
+    .logo-2 {
+      width: 100%;
+      height: 100%;
+      border-bottom: 6px solid white;
+      border-left: 6px solid white;
+      box-sizing: border-box;
+    }
+
+    /* --- 6. Headline (DM Serif Font) --- */
+    .headline {
+      font-size: 2.5rem; /* 40px */
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.9);
+      margin: 20px 0 30px 0;
+      text-align: center;
+      font-family: 'DM Serif Display', serif;
+    }
+
+    /* --- 7. Glass Chat Widget (Wider) --- */
+    .chat-widget-container {
+      width: 90%;
+      max-width: 900px;
+      height: 50vh;
+      background: rgba(15, 25, 20, 0.6); 
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      z-index: 1; /* Ensure it stays above the aurora */
+    }
+
+    /* --- 8. Message Area (Dark Theme) --- */
+    .message-area {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .message {
+      padding: 10px 15px;
+      border-radius: 18px;
+      line-height: 1.4;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+    .message.user {
+      background: #008f4c; /* Riverwood Green */
+      color: white;
+      border-bottom-right-radius: 4px;
+      align-self: flex-end;
+    }
+    .message.ai {
+      background: #333333; /* Dark grey */
+      color: #eeeeee;
+      border-bottom-left-radius: 4px;
+      align-self: flex-start;
+    }
+
+    /* --- 9. Voice-First Input Area --- */
+    .input-area {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    
+    #speakBtn {
+      background: #008f4c;
+      border: none;
+      color: white;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s, box-shadow 0.3s;
+      padding: 0;
+    }
+    #speakBtn:hover {
+      background: #00a055;
+    }
+    
+    #speakBtn svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
+    }
+
+    #speakBtn.listening {
+      background: #d90429;
+      animation: pulse-red 1.5s infinite;
+    }
+
+    @keyframes pulse-red {
+      0% {
+        box-shadow: 0 0 0 0 rgba(217, 4, 41, 0.7);
+      }
+      70% {
+        box-shadow: 0 0 0 20px rgba(217, 4, 41, 0);
+      }
+      100% {
+        box-shadow: 0 0 0 0 rgba(217, 4, 41, 0);
+      }
+    }
+
+    #audioPlayer { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="brand-title">RIVERWOOD</div>
+
+  <div class="main-container">
+    
+    <div class="top-content">
+      <div class="logo-container">
+        <div class="logo-1">
+          <div class="logo-2"></div>
+        </div>
+      </div>
+      <h1 class="headline">Built On Your Trust</h1>
+    </div>
+
+    <div class="chat-widget-container">
+      
+      <div class="message-area" id="messageContainer">
+        <div class="message ai">Namaste! This is Miss Riverwood. How can I help you today?</div>
+      </div>
+      
+      <div class="input-area">
+        <button id="speakBtn" title="Speak">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
+            <path d="M192 0C139 0 96 43 96 96V256c0 53 43 96 96 96s96-43 96-96V96c0-53-43-96-96-96zM64 216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 89.1 66.2 162.7 152 174.4V464H120c-13.3 0-24 10.7-24 24s10.7 24 24 24h144c13.3 0 24-10.7 24-24s-10.7-24-24-24H216V430.4c85.8-11.7 152-85.3 152-174.4V216c0-13.3-10.7-24-24-24s-24 10.7-24 24v40c0 70.7-57.3 128-128 128s-128-57.3-128-128V216z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audioPlayer"></audio>
+
+  <script>
+    // --- JAVASCRIPT (WITH DEBUG LOGS) ---
+
+    const speakBtn = document.getElementById("speakBtn");
+    const player = document.getElementById("audioPlayer");
+    const messageContainer = document.getElementById("messageContainer");
+
+    // --- DEBUG: Check if elements are found ---
+    console.log("Script loaded. speakBtn:", speakBtn, "player:", player);
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.continuous = false;
+
+    function addMessage(text, role) {
+      console.log(`Adding message for ${role}: ${text}`); // --- DEBUG LOG ---
+      const msgDiv = document.createElement("div");
+      msgDiv.className = `message ${role}`;
+      msgDiv.innerText = text;
+      messageContainer.appendChild(msgDiv);
+      messageContainer.scrollTop = messageContainer.scrollHeight;
+    }
+
+    speakBtn.onclick = () => {
+      if (speakBtn.classList.contains("listening")) {
+        console.log("Manually stopping recognition."); // --- DEBUG LOG ---
+        recognition.stop();
+      } else {
+        console.log("Starting recognition..."); // --- DEBUG LOG ---
+        recognition.start();
+      }
+    };
+    
+    recognition.onstart = () => {
+      console.log("Recognition started (onstart event)."); // --- DEBUG LOG ---
+      speakBtn.classList.add("listening");
+    };
+
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      console.log("Speech recognized (onresult event):", text); // --- DEBUG LOG ---
+      sendMessage(text);
+    };
+    
+    recognition.onerror = (e) => {
+      // --- CHANGED: Replaced alert() with console.error() ---
+      console.error("Voice input error (onerror event):", e.error); 
+      speakBtn.classList.remove("listening");
+    };
+
+    recognition.onend = () => {
+      console.log("Recognition ended (onend event)."); // --- DEBUG LOG ---
+      speakBtn.classList.remove("listening");
+    };
+
+    async function sendMessage(text) {
+      const userText = text.trim();
+      if (userText === "") return;
+
+      console.log(`Sending to backend: "${userText}"`); // --- DEBUG LOG ---
+      addMessage(userText, "user");
+
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: userText })
+        });
+
+        console.log("Backend response received, status:", res.status); // --- DEBUG LOG ---
+        const data = await res.json();
+        console.log("Backend data parsed:", data); // --- DEBUG LOG ---
+        
+        if (data.reply) {
+          addMessage(data.reply, "ai");
+          player.src = `data:audio/mp3;base64,${data.audio_base64}`;
+          player.play();
+        } else if (data.error) {
+           addMessage(`Error from backend: ${data.error}`, "ai");
+        }
+
+      } catch (error) {
+        console.error("Error fetching or parsing backend response:", error); // --- DEBUG LOG ---
+        addMessage("Sorry, I'm having trouble connecting. (Fetch Error)", "ai");
+      }
+    }
+</script>
+</body>
+</html>

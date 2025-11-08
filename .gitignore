@@ -1,0 +1,4 @@
+.env
+convo_agent/
+__pycache__/
+*.mp3touc
