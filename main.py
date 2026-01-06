@@ -1,84 +1,117 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.templating import Jinja2Templates
-# --- 1. Import Groq ---
-from groq import Groq 
-import requests
 import os
-import base64
-from dotenv import load_dotenv
+from groq import Groq
+from fastapi import FastAPI, Request, Form, Response
+from fastapi.responses import Response as TwiMLResponse
 
-load_dotenv()
-
-# --- 2. Instantiate Groq client ---
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+# --- 1. SET UP GROQ CLIENT ---
+try:
+    client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+    print("✅ Groq client initialized.")
+except Exception as e:
+    print(f"❌ Groq API key not found or invalid. Please set GROQ_API_KEY. Error: {e}")
+    client = None
 
 app = FastAPI()
 
-# --- 3. ADDED BACK: Template configuration ---
-# (Make sure your folder is named "template" (singular))
-templates = Jinja2Templates(directory="template")
+# --- 2. MODEL SELECTION (SPEED FOCUSED) ---
+# "llama-3.1-8b-instant" is the fastest model available. 
+MODEL_ID = "llama-3.1-8b-instant"
 
-# --- 4. ADDED BACK: Conversation history ---
-conversation_history = [
-    {"role": "system", "content": "You are Miss Riverwood, a friendly AI voice agent. Speak warmly in Hinglish. Your goal is to build a bond. **Keep your replies very short, like 1-2 sentences.**"}
-]
+conversations = {}
 
-# --- 5. ADDED BACK: The missing GET / route ---
-@app.get("/")
-def home(request: Request):
+# --- 3. PROJECT MEMORY ---
+PROJECT_INFO = """
+PROJECT DETAILS:
+- Project Name: Towers1
+- Status: Foundation work is complete. Currently building the 1st Floor.
+- Completion Date: Expected December 2025.
+- Location: Riverwood Greens, near the main highway.
+- Contractor: Sharma Constructions.
+"""
+
+# --- 4. SYSTEM PROMPT (Hinglish Persona) ---
+SYSTEM_PROMPT = f"""
+You are Miss Riverwood, a friendly and warm AI voice agent for a construction company.
+You are speaking on the phone, so keep your replies **extremely short (1-2 sentences max)**.
+
+**Language Style:**
+- Speak in "Hinglish" (a mix of Hindi and English). 
+- Use words like "Haan ji", "Bilkul", "Arre wah", "Theek hai".
+- Be very polite and energetic.
+
+**Your Knowledge:**
+Use the following information to answer questions:
+{PROJECT_INFO}
+
+If asked about something else, politely say you only know about Towers1.
+"""
+
+@app.api_route("/voice", methods=["GET", "POST"])
+async def voice(request: Request):
+    form_data = await request.form()
+    call_sid = form_data.get("CallSid", "default_call_sid")
     
-    conversation_history.clear()
-    conversation_history.append(
-        {"role": "system", "content": "You are Miss Riverwood, a friendly AI voice agent. Speak warmly in Hinglish. Your goal is to build a bond. **Keep your replies very short, like 1-2 sentences.**"}
-    )
-    return templates.TemplateResponse("simple_frontend.html", {"request": request})
+    conversations[call_sid] = [
+        {"role": "system", "content": SYSTEM_PROMPT}
+    ]
+    print(f"📞 New call {call_sid} received.")
 
-# --- 6. This is the updated POST /chat route ---
-@app.post("/chat")
-async def chat(request: Request):
-    data = await request.json()
-    user_text = data.get("text")
+    # Initial Greeting in Hinglish with Indian Voice
+    twiml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Aditi">
+        Namaste! This is Miss Riverwood. Kaise help kar sakti hoon main aapki?
+    </Say>
+    <Gather input="speech" speechTimeout="auto" action="/handle_speech" method="POST">
+    </Gather>
+    <Redirect method="POST">/voice</Redirect>
+</Response>
+"""
+    return TwiMLResponse(content=twiml, media_type="text/xml")
+
+
+@app.api_route("/handle_speech", methods=["GET", "POST"])
+async def handle_speech(request: Request):
+    form_data = await request.form()
+    user_speech = form_data.get("SpeechResult", "")
+    call_sid = form_data.get("CallSid", "default_call_sid")
     
-    conversation_history.append({"role": "user", "content": user_text})
+    print(f"[{call_sid}] 👤 User said: {user_speech}")
 
-    # Use Groq (Llama 3) for the reply
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # <-- THIS IS THE NEW, ACTIVE MODEL
-            messages=conversation_history,
-            max_tokens=75,
-        )
+    llm_response_text = "Arre sorry, awaaz kat rahi hai. Can you say that again?"
+    
+    if client and user_speech:
+        history = conversations.get(call_sid, [])
+        history.append({"role": "user", "content": user_speech})
         
-        reply = response.choices[0].message.content
-        conversation_history.append({"role": "assistant", "content": reply})
+        try:
+            # Call Groq with the FASTEST model
+            completion = client.chat.completions.create(
+                model=MODEL_ID, 
+                messages=history,
+                temperature=0.7, 
+                max_tokens=100 
+            )
+            
+            llm_response_text = completion.choices[0].message.content
+            print(f"[{call_sid}] 🤖 Miss Riverwood: {llm_response_text}")
 
-    except Exception as e:
-        print(f"Error calling Groq: {e}")
-        return JSONResponse({"error": "Error with the AI model"}, status_code=500)
+            history.append({"role": "assistant", "content": llm_response_text})
+            conversations[call_sid] = history
 
-    # Convert reply to speech (ElevenLabs)
-    try:
-        tts_url = "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL"  # 'Rachel' voice
-        headers = {
-            "xi-api-key": ELEVENLABS_API_KEY,
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "text": reply,
-            "voice_settings": {"stability": 0.6, "similarity_boost": 0.8}
-        }
-        tts_response = requests.post(tts_url, headers=headers, json=payload)
+        except Exception as e:
+            print(f"❌ Error calling Groq: {e}")
 
-        if tts_response.status_code == 200:
-            audio_data = tts_response.content
-            audio_base64 = base64.b64encode(audio_data).decode('utf-8')
-            return JSONResponse({"reply": reply, "audio_base64": audio_base64})
-        else:
-            print(f"ElevenLabs Error: {tts_response.text}")
-            return JSONResponse({"error": "ElevenLabs API error"}, status_code=500)
-
-    except Exception as e:
-        print(f"Error calling ElevenLabs: {e}")
-        return JSONResponse({"error": "Error with the voice generation"}, status_code=500)
+    # Using "Polly.Aditi" voice for better Indian accent support
+    twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Aditi">
+        {llm_response_text}
+    </Say>
+    <Gather input="speech" speechTimeout="auto" action="/handle_speech" method="POST">
+    </Gather>
+    <Say>Call cut kar rahi hoon. Bye!</Say>
+    <Hangup/>
+</Response>
+"""
+    return TwiMLResponse(content=twiml, media_type="text/xml")
